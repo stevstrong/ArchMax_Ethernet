@@ -1,0 +1,7 @@
+Ethernet library for Arch Max v1.1 board (STM32F407VET6)
+----------------------------------------------
+This library is designed to be used with Arduino IDE for STM32F4 (https://github.com/stevstrong/Arduino_STM32).
+
+The library is based on [STM32070 SW package](https://www.st.com/en/embedded-software/stsw-stm32070.html) including LwIP 1.4.1.
+
+Some of the LwIP files are relocated for a simplier files structure.
