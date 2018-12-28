@@ -841,8 +841,6 @@ tcp_build_timestamp_option(struct tcp_pcb *pcb, u32_t *opts)
 err_t
 tcp_send_empty_ack(struct tcp_pcb *pcb)
 {
-  struct pbuf *p;
-  struct tcp_hdr *tcphdr;
   u8_t optlen = 0;
 
 #if LWIP_TCP_TIMESTAMPS
@@ -851,12 +849,11 @@ tcp_send_empty_ack(struct tcp_pcb *pcb)
   }
 #endif
 
-  p = tcp_output_alloc_header(pcb, optlen, 0, htonl(pcb->snd_nxt));
+  struct pbuf *p = tcp_output_alloc_header(pcb, optlen, 0, htonl(pcb->snd_nxt));
   if (p == NULL) {
     LWIP_DEBUGF(TCP_OUTPUT_DEBUG, ("tcp_output: (ACK) could not allocate pbuf\n"));
     return ERR_BUF;
   }
-  tcphdr = (struct tcp_hdr *)p->payload;
   LWIP_DEBUGF(TCP_OUTPUT_DEBUG, 
               ("tcp_output: sending ACK for %"U32_F"\n", pcb->rcv_nxt));
   /* remove ACK flags from the PCB, as we send an empty ACK now */
@@ -864,6 +861,7 @@ tcp_send_empty_ack(struct tcp_pcb *pcb)
 
   /* NB. MSS option is only sent on SYNs, so ignore it here */
 #if LWIP_TCP_TIMESTAMPS
+  struct tcp_hdr *tcphdr = (struct tcp_hdr *)p->payload;
   pcb->ts_lastacksent = pcb->rcv_nxt;
 
   if (pcb->flags & TF_TIMESTAMP) {
@@ -1363,9 +1361,6 @@ tcp_rexmit_fast(struct tcp_pcb *pcb)
 void
 tcp_keepalive(struct tcp_pcb *pcb)
 {
-  struct pbuf *p;
-  struct tcp_hdr *tcphdr;
-
   LWIP_DEBUGF(TCP_DEBUG, ("tcp_keepalive: sending KEEPALIVE probe to %"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
                           ip4_addr1_16(&pcb->remote_ip), ip4_addr2_16(&pcb->remote_ip),
                           ip4_addr3_16(&pcb->remote_ip), ip4_addr4_16(&pcb->remote_ip)));
@@ -1373,15 +1368,15 @@ tcp_keepalive(struct tcp_pcb *pcb)
   LWIP_DEBUGF(TCP_DEBUG, ("tcp_keepalive: tcp_ticks %"U32_F"   pcb->tmr %"U32_F" pcb->keep_cnt_sent %"U16_F"\n", 
                           tcp_ticks, pcb->tmr, pcb->keep_cnt_sent));
    
-  p = tcp_output_alloc_header(pcb, 0, 0, htonl(pcb->snd_nxt - 1));
+  struct pbuf *p = tcp_output_alloc_header(pcb, 0, 0, htonl(pcb->snd_nxt - 1));
   if(p == NULL) {
     LWIP_DEBUGF(TCP_DEBUG, 
                 ("tcp_keepalive: could not allocate memory for pbuf\n"));
     return;
   }
-  tcphdr = (struct tcp_hdr *)p->payload;
 
 #if CHECKSUM_GEN_TCP
+  struct tcp_hdr *tcphdr = (struct tcp_hdr *)p->payload;
   tcphdr->chksum = inet_chksum_pseudo(p, &pcb->local_ip, &pcb->remote_ip,
                                       IP_PROTO_TCP, p->tot_len);
 #endif
