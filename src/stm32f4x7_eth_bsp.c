@@ -27,10 +27,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "lwip/opt.h"
-#include "stm32f4x7_eth.h"
-#include "stm32f4x7_eth_bsp.h"
 #include "main.h"
 #include "lwip/netif.h"
+#include "stm32f4x7_eth.h"
+#include "stm32f4x7_eth_bsp.h"
 #include "netconf.h"
 #include "lwip/dhcp.h"
 
@@ -39,10 +39,10 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 ETH_InitTypeDef ETH_InitStructure;
-__IO uint32_t  EthStatus = 0;
+uint32_t EthStatus;
 extern struct netif gnetif;
 #ifdef USE_DHCP
-extern __IO uint8_t DHCP_state;
+extern uint8_t DHCP_state;
 #endif /* LWIP_DHCP */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,43 +58,14 @@ static void ETH_MACDMA_Config(void);
   */
 void ETH_BSP_Config(void)
 {
-#if 0
-  RCC_ClocksTypeDef RCC_Clocks;
-
-  /***************************************************************************
-    NOTE: 
-         When using Systick to manage the delay in Ethernet driver, the Systick
-         must be configured before Ethernet initialization and, the interrupt 
-         priority should be the highest one.
-  *****************************************************************************/
-  
-  /* Configure Systick clock source as HCLK */
-  SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);
-
-  /* SystTick configuration: an interrupt every 10ms */
-  RCC_GetClocksFreq(&RCC_Clocks);
-  SysTick_Config(RCC_Clocks.HCLK_Frequency / 100);
-  
-  /* Set Systick interrupt priority to 0*/
-  NVIC_SetPriority (SysTick_IRQn, 0);
-
-  /* Configure the GPIO ports for ethernet pins */
-  ETH_GPIO_Config();
-#endif  
   /* Configure the Ethernet MAC/DMA */
   ETH_MACDMA_Config();
 
   /* Get Ethernet link status*/
-  if(ETH_ReadPHYRegister(DP83848_PHY_ADDRESS, PHY_SR) & 1)
+  if(ETH_ReadPHYRegister(PHY_SR) & 1)
   {
     EthStatus |= ETH_LINK_FLAG;
   }
-
-  /* Configure the PHY to generate an interrupt on change of link status */
-//  Eth_Link_PHYITConfig(DP83848_PHY_ADDRESS);
-
-  /* Configure the EXTI for Ethernet link status. */
-//  Eth_Link_EXTIConfig();
 }
 
 /**
@@ -104,12 +75,6 @@ void ETH_BSP_Config(void)
   */
 static void ETH_MACDMA_Config(void)
 {  
-  /* Enable ETHERNET clock  */
-//  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_ETH_MAC | RCC_AHB1Periph_ETH_MAC_Tx | RCC_AHB1Periph_ETH_MAC_Rx, ENABLE);
-
-  /* Reset ETHERNET on AHB Bus */
-//  ETH_DeInit();
-
   /* Software reset */
   ETH_SoftwareReset();
 
@@ -124,7 +89,7 @@ static void ETH_MACDMA_Config(void)
   /*------------------------   MAC   -----------------------------------*/
   ETH_InitStructure.ETH_AutoNegotiation = ETH_AutoNegotiation_Enable;
 //  ETH_InitStructure.ETH_AutoNegotiation = ETH_AutoNegotiation_Disable;
-//  ETH_InitStructure.ETH_Speed = ETH_Speed_10M;
+//  ETH_InitStructure.ETH_Speed = ETH_Speed_100M;
 //  ETH_InitStructure.ETH_Mode = ETH_Mode_FullDuplex;
 
   ETH_InitStructure.ETH_LoopbackMode = ETH_LoopbackMode_Disable;
@@ -158,246 +123,21 @@ static void ETH_MACDMA_Config(void)
   ETH_InitStructure.ETH_DMAArbitration = ETH_DMAArbitration_RoundRobin_RxTx_2_1;
 
   /* Configure Ethernet */
-  EthStatus = ETH_Init(&ETH_InitStructure, DP83848_PHY_ADDRESS);
-}
-#if 0
-/**
-  * @brief  Configures the different GPIO ports.
-  * @param  None
-  * @retval None
-  */
-void ETH_GPIO_Config(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-  
-  /* Enable GPIOs clocks */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB |
-                         RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOI |
-                         RCC_AHB1Periph_GPIOG | RCC_AHB1Periph_GPIOH |
-                         RCC_AHB1Periph_GPIOF, ENABLE);
-
-  /* Enable SYSCFG clock */
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-  /* Configure MCO (PA8) */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-  /* MII/RMII Media interface selection --------------------------------------*/
-#ifdef MII_MODE /* Mode MII with STM324xx-EVAL  */
- #ifdef PHY_CLOCK_MCO
-
-
-  /* Output HSE clock (25MHz) on MCO pin (PA8) to clock the PHY */
-  RCC_MCO1Config(RCC_MCO1Source_HSE, RCC_MCO1Div_1);
- #endif /* PHY_CLOCK_MCO */
-
-  SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_MII);
-#elif defined RMII_MODE  /* Mode RMII with STM324xx-EVAL */
-
-  SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_RMII);
-#endif
-
-#ifdef MII_MODE
-  /* Ethernet pins configuration ************************************************/
-   /*
-        ETH_MDIO -------------------------> PA2
-        ETH_MDC --------------------------> PC1
-        ETH_PPS_OUT ----------------------> PB5
-        ETH_MII_CRS ----------------------> PH2
-        ETH_MII_COL ----------------------> PH3
-        ETH_MII_RX_ER --------------------> PI10
-        ETH_MII_RXD2 ---------------------> PH6
-        ETH_MII_RXD3 ---------------------> PH7
-        ETH_MII_TX_CLK -------------------> PC3
-        ETH_MII_TXD2 ---------------------> PC2
-        ETH_MII_TXD3 ---------------------> PB8
-        ETH_MII_RX_CLK/ETH_RMII_REF_CLK---> PA1
-        ETH_MII_RX_DV/ETH_RMII_CRS_DV ----> PA7
-        ETH_MII_RXD0/ETH_RMII_RXD0 -------> PC4
-        ETH_MII_RXD1/ETH_RMII_RXD1 -------> PC5
-        ETH_MII_TX_EN/ETH_RMII_TX_EN -----> PG11
-        ETH_MII_TXD0/ETH_RMII_TXD0 -------> PG13
-        ETH_MII_TXD1/ETH_RMII_TXD1 -------> PG14
-                                                  */
-
-  /* Configure PA1, PA2 and PA7 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_7;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource7, GPIO_AF_ETH);
-
-  /* Configure PB5 and PB8 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5 | GPIO_Pin_8;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOB, GPIO_PinSource5, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_ETH);
-
-  /* Configure PC1, PC2, PC3, PC4 and PC5 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_4 | GPIO_Pin_5;
-  GPIO_Init(GPIOC, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource1, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource2, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource3, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource4, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource5, GPIO_AF_ETH);
-
-  /* Configure PG11, PG14 and PG13 */
-  GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_11 | GPIO_Pin_13 | GPIO_Pin_14;
-  GPIO_Init(GPIOG, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOG, GPIO_PinSource11, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOG, GPIO_PinSource13, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOG, GPIO_PinSource14, GPIO_AF_ETH);
-
-  /* Configure PH2, PH3, PH6, PH7 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_6 | GPIO_Pin_7;
-  GPIO_Init(GPIOH, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOH, GPIO_PinSource2, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOH, GPIO_PinSource3, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOH, GPIO_PinSource6, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOH, GPIO_PinSource7, GPIO_AF_ETH);
-
-  /* Configure PI10 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
-  GPIO_Init(GPIOI, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOI, GPIO_PinSource10, GPIO_AF_ETH);
-
-#elif defined RMII_MODE
-
-  /**ETH GPIO Configuration
-     PC1     ------> ETH_MDC
-     PA1     ------> ETH_REF_CLK
-     PA2     ------> ETH_MDIO
-     PA7     ------> ETH_CRS_DV
-     PC4     ------> ETH_RXD0
-     PC5     ------> ETH_RXD1
-     PB11     ------> ETH_TX_EN
-     PB12     ------> ETH_TXD0
-     PB13     ------> ETH_TXD1
-   */
-  /* Configure PA1, PA2 and PA7 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_7;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource7, GPIO_AF_ETH);
-
-  /* Configure PB11, PB12 and PB13 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11 | GPIO_Pin_12 | GPIO_Pin_13;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOB, GPIO_PinSource12, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOB, GPIO_PinSource13, GPIO_AF_ETH);
-
-  /* Configure PC1, PC4 and PC5 */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_4 | GPIO_Pin_5;
-  GPIO_Init(GPIOC, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource1, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource4, GPIO_AF_ETH);
-  GPIO_PinAFConfig(GPIOC, GPIO_PinSource5, GPIO_AF_ETH);
-
-#endif
-
+  EthStatus = ETH_Init(&ETH_InitStructure);
 }
 
-/**
-  * @brief  Configure the PHY to generate an interrupt on change of link status.
-  * @param PHYAddress: external PHY address  
-  * @retval None
-  */
-uint32_t Eth_Link_PHYITConfig(uint16_t PHYAddress)
-{
-  uint16_t tmpreg = 0;
+/**ETH GPIO Configuration in RMII mode
+ PC1     ------> ETH_MDC
+ PA1     ------> ETH_REF_CLK
+ PA2     ------> ETH_MDIO
+ PA7     ------> ETH_CRS_DV
+ PC4     ------> ETH_RXD0
+ PC5     ------> ETH_RXD1
+ PB11     ------> ETH_TX_EN
+ PB12     ------> ETH_TXD0
+ PB13     ------> ETH_TXD1
+*/
 
-  /* Read MICR register */
-  tmpreg = ETH_ReadPHYRegister(PHYAddress, PHY_MICR);
-
-  /* Enable output interrupt events to signal via the INT pin */
-  tmpreg |= (uint16_t)(PHY_MICR_INT_EN | PHY_MICR_INT_OE);
-  if(!(ETH_WritePHYRegister(PHYAddress, PHY_MICR, tmpreg)))
-  {
-    /* Return ERROR in case of write timeout */
-    return ETH_ERROR;
-  }
-
-  /* Read MISR register */
-  tmpreg = ETH_ReadPHYRegister(PHYAddress, PHY_MISR);
-
-  /* Enable Interrupt on change of link status */
-  tmpreg |= (uint16_t)PHY_MISR_LINK_INT_EN;
-  if(!(ETH_WritePHYRegister(PHYAddress, PHY_MISR, tmpreg)))
-  {
-    /* Return ERROR in case of write timeout */
-    return ETH_ERROR;
-  }
-  /* Return SUCCESS */
-  return ETH_SUCCESS;   
-}
-
-/**
-  * @brief  EXTI configuration for Ethernet link status.
-  * @param PHYAddress: external PHY address  
-  * @retval None
-  */
-void Eth_Link_EXTIConfig(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-  EXTI_InitTypeDef EXTI_InitStructure;
-  NVIC_InitTypeDef NVIC_InitStructure;
-
-  /* Enable the INT (PB14) Clock */
-  RCC_AHB1PeriphClockCmd(ETH_LINK_GPIO_CLK, ENABLE);
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-  /* Configure INT pin as input */
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-  GPIO_InitStructure.GPIO_Pin = ETH_LINK_PIN;
-  GPIO_Init(ETH_LINK_GPIO_PORT, &GPIO_InitStructure);
-
-  /* Connect EXTI Line to INT Pin */
-  SYSCFG_EXTILineConfig(ETH_LINK_EXTI_PORT_SOURCE, ETH_LINK_EXTI_PIN_SOURCE);
-
-  /* Configure EXTI line */
-  EXTI_InitStructure.EXTI_Line = ETH_LINK_EXTI_LINE;
-  EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
-  EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-  EXTI_Init(&EXTI_InitStructure);
-
-  /* Enable and set the EXTI interrupt to priority 1*/
-  NVIC_InitStructure.NVIC_IRQChannel = EXTI15_10_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);
-}
-
-/**
-  * @brief  This function handles Ethernet link status.
-  * @param  None
-  * @retval None
-  */
-void Eth_Link_ITHandler(uint16_t PHYAddress)
-{
-  /* Check whether the link interrupt has occurred or not */
-  if(((ETH_ReadPHYRegister(PHYAddress, PHY_MISR)) & PHY_LINK_STATUS) != 0)
-  {
-    if((ETH_ReadPHYRegister(PHYAddress, PHY_SR) & 1))
-    {
-      netif_set_link_up(&gnetif);
-    }
-    else
-    {
-      netif_set_link_down(&gnetif);
-    }
-  }
-}
-#endif
 /**
   * @brief  Link callback function, this function is called on change of link status.
   * @param  The network interface
@@ -405,46 +145,33 @@ void Eth_Link_ITHandler(uint16_t PHYAddress)
   */
 void ETH_link_callback(struct netif *netif)
 {
-  __IO uint32_t timeout = 0;
- uint32_t tmpreg,RegValue;
-  struct ip_addr ipaddr;
-  struct ip_addr netmask;
-  struct ip_addr gw;
-#ifndef USE_DHCP
-  uint8_t iptab[4] = {0};
-  uint8_t iptxt[20];
-#endif /* USE_DHCP */
-#ifdef USE_LCD
-  /* Clear LCD */
-  LCD_ClearLine(Line4);
-  LCD_ClearLine(Line5);
-  LCD_ClearLine(Line6);
-  LCD_ClearLine(Line7);
-  LCD_ClearLine(Line8);
-  LCD_ClearLine(Line9);
-#endif
+	PRINTF("<ETH_link_callback.");
+  struct ip4_addr ipaddr;
+  struct ip4_addr netmask;
+  struct ip4_addr gw;
+
   if(netif_is_link_up(netif))
   {
     /* Restart the autonegotiation */
     if(ETH_InitStructure.ETH_AutoNegotiation != ETH_AutoNegotiation_Disable)
     {
       /* Reset Timeout counter */
-      timeout = 0;
+      uint32_t timeout = 0;
+
+      /* Enable 100Mbps full-duplex */
+      ETH_WritePHYRegister(PHY_ADVERTISE, PHY_ADVERTISE_100FULL);
 
       /* Enable Auto-Negotiation */
-      ETH_WritePHYRegister(DP83848_PHY_ADDRESS, PHY_BCR, PHY_AutoNegotiation);
+      ETH_WritePHYRegister(PHY_BCR, PHY_AutoNegotiation);
 
       /* Wait until the auto-negotiation will be completed */
       do
       {
         timeout++;
-      } while (!(ETH_ReadPHYRegister(DP83848_PHY_ADDRESS, PHY_BSR) & PHY_AutoNego_Complete) && (timeout < (uint32_t)PHY_READ_TO));
-
-      /* Reset Timeout counter */
-      timeout = 0;
+      } while (!(ETH_ReadPHYRegister(PHY_BSR) & PHY_AutoNego_Complete) && (timeout < (uint32_t)PHY_READ_TO));
 
       /* Read the result of the auto-negotiation */
-      RegValue = ETH_ReadPHYRegister(DP83848_PHY_ADDRESS, PHY_SR);
+      uint32_t RegValue = ETH_ReadPHYRegister(PHY_SR);
     
       /* Configure the MAC with the Duplex Mode fixed by the auto-negotiation process */
       if((RegValue & PHY_DUPLEX_STATUS) != (uint32_t)RESET)
@@ -471,7 +198,7 @@ void ETH_link_callback(struct netif *netif)
 
       /*------------------------ ETHERNET MACCR Re-Configuration --------------------*/
       /* Get the ETHERNET MACCR value */  
-      tmpreg = ETH->MACCR;
+      uint32_t tmpreg = ETH->MACCR;
 
       /* Set the FES bit according to ETH_Speed value */ 
       /* Set the DM bit according to ETH_Mode value */ 
@@ -487,6 +214,7 @@ void ETH_link_callback(struct netif *netif)
 
     /* Restart MAC interface */
     ETH_Start();
+	PRINTF(".>ETH_Stop.");
 
 #ifdef USE_DHCP
     ipaddr.addr = 0;
@@ -503,37 +231,11 @@ void ETH_link_callback(struct netif *netif)
     
     /* When the netif is fully configured this function must be called.*/
     netif_set_up(&gnetif);    
-
-#ifdef USE_LCD
-    /* Set the LCD Text Color */
-    LCD_SetTextColor(Green);
-
-    /* Display message on the LCD */
-    LCD_DisplayStringLine(Line5, (uint8_t*)"  Network Cable is  ");
-    LCD_DisplayStringLine(Line6, (uint8_t*)"    now connected   ");
-
-    /* Set the LCD Text Color */
-    LCD_SetTextColor(White);
-
-  #ifndef USE_DHCP
-    /* Display static IP address */
-    iptab[0] = IP_ADDR3;
-    iptab[1] = IP_ADDR2;
-    iptab[2] = IP_ADDR1;
-    iptab[3] = IP_ADDR0;
-    sprintf((char*)iptxt, "  %d.%d.%d.%d", iptab[3], iptab[2], iptab[1], iptab[0]);
-    LCD_DisplayStringLine(Line8, (uint8_t*)"  Static IP address   ");
-    LCD_DisplayStringLine(Line9, iptxt);
-
-    /* Clear LCD */
-    LCD_ClearLine(Line5);
-    LCD_ClearLine(Line6);
-  #endif /* USE_DHCP */
-#endif /* USE_LCD */
   }
   else
   {
     ETH_Stop();
+	PRINTF(".>ETH_Stop.");
 #ifdef USE_DHCP
     DHCP_state = DHCP_LINK_DOWN;
     dhcp_stop(netif);
@@ -541,18 +243,8 @@ void ETH_link_callback(struct netif *netif)
 
     /*  When the netif link is down this function must be called.*/
     netif_set_down(&gnetif);
-#ifdef USE_LCD
-    /* Set the LCD Text Color */
-    LCD_SetTextColor(Red);
-
-    /* Display message on the LCD */
-    LCD_DisplayStringLine(Line5, (uint8_t*)"  Network Cable is  ");
-    LCD_DisplayStringLine(Line6, (uint8_t*)"     unplugged   ");
-
-    /* Set the LCD Text Color */
-    LCD_SetTextColor(White);
-#endif /* USE_LCD */
   }
+	PRINTF(".ETH_link_callback>\n");
 }
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

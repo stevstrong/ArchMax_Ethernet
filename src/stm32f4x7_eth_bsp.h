@@ -40,6 +40,8 @@
 /* Exported constants --------------------------------------------------------*/
 #define DP83848_PHY_ADDRESS       0x01 /* Relative to STM324xG-EVAL Board */
 
+static const uint16_t PHYAddress = DP83848_PHY_ADDRESS;
+
 /* Ethernet Flags for EthStatus variable */
 #define ETH_INIT_FLAG           0x01 /* Ethernet Init Flag */
 #define ETH_LINK_FLAG           0x10 /* Ethernet Link Flag */

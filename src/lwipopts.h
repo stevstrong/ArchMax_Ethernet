@@ -30,6 +30,39 @@
 #ifndef __LWIPOPTS_H__
 #define __LWIPOPTS_H__
 
+
+#include "lwipopts.h"
+#include "lwip/debug_def.h"
+
+
+/*
+   ----------------------------------------
+   ---------- Lwip Debug options ----------
+   ----------------------------------------
+*/
+//#define LWIP_DEBUG   LWIP_DBG_ON
+//#define DHCP_DEBUG   LWIP_DBG_ON
+//#define ETHARP_DEBUG   LWIP_DBG_ON
+//#define TCP_INPUT_DEBUG   LWIP_DBG_ON
+//#define NETIF_DEBUG   LWIP_DBG_ON
+//#define TIMERS_DEBUG LWIP_DBG_ON
+//#define LWIP_DEBUG_TIMERNAMES 1
+//#define HTTPD_DEBUG   LWIP_DBG_ON
+
+//---------------------------------------------
+// HTTPD options
+//---------------------------------------------
+#define LWIP_HTTPD_CGI  1
+#define LWIP_HTTPD_SSI  1
+//#define LWIP_HTTPD_CGI_SSI  1
+#define LWIP_HTTPD_DYNAMIC_HEADERS 1
+#define LWIP_HTTPD_DYNAMIC_FILE_READ 1
+
+#define HTTPD_USE_MEM_POOL  1
+#define MEMP_NUM_PARALLEL_HTTPD_CONNS      2
+#define MEMP_NUM_PARALLEL_HTTPD_SSI_CONNS  2
+
+
 /**
  * SYS_LIGHTWEIGHT_PROT==1: if you want inter-task protection for certain
  * critical regions during buffer allocation, deallocation and memory
@@ -41,13 +74,23 @@
  * NO_SYS==1: Provides VERY minimal functionality. Otherwise,
  * use lwIP facilities.
  */
-#define NO_SYS                  1
+#define NO_SYS      1
+#define LWIP_IPV4   1
+#define LWIP_ARP    1
 
 /**
  * NO_SYS_NO_TIMERS==1: Drop support for sys_timeout when NO_SYS==1
  * Mainly for compatibility to old versions.
  */
-#define NO_SYS_NO_TIMERS        1
+//#define NO_SYS_NO_TIMERS        1
+
+#define LWIP_NETIF_HOSTNAME       1
+
+#define LWIP_TIMERS  1
+
+#define LWIP_NETIF_LINK_CALLBACK 1
+
+
 
 /* ---------- Memory options ---------- */
 /* MEM_ALIGNMENT: should be set to the alignment of the CPU for which
@@ -65,10 +108,10 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_PBUF           10
 /* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
    per active UDP "connection". */
-#define MEMP_NUM_UDP_PCB        6
+#define MEMP_NUM_UDP_PCB        4
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
    connections. */
-#define MEMP_NUM_TCP_PCB        10
+#define MEMP_NUM_TCP_PCB        8
 /* MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP
    connections. */
 #define MEMP_NUM_TCP_PCB_LISTEN 6
@@ -97,7 +140,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_QUEUE_OOSEQ         0
 
 /* TCP Maximum segment size. */
-#define TCP_MSS                 (1500 - 40)/* TCP_MSS = (Ethernet MTU - IP header size - TCP header size) */
+#define TCP_MSS                 (1500 - 40) /* TCP_MSS = (Ethernet MTU - IP header size - TCP header size) */
 
 /* TCP sender buffer space (bytes). */
 #define TCP_SND_BUF             (4*TCP_MSS)
@@ -112,7 +155,7 @@ a lot of data that needs to be copied, this should be set high. */
 
 
 /* ---------- ICMP options ---------- */
-#define LWIP_ICMP                       1
+#define LWIP_ICMP               1
 
 
 /* ---------- DHCP options ---------- */
@@ -128,15 +171,19 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- Statistics options ---------- */
 #define LWIP_STATS 0
-#define LWIP_PROVIDE_ERRNO 1
+//#define LWIP_STATS_DISPLAY 1
+#define LWIP_PROVIDE_ERRNO     1
+
+// use DNS
+#define LWIP_DNS               0
+
+
 
 /* ---------- link callback options ---------- */
 /* LWIP_NETIF_LINK_CALLBACK==1: Support a callback function from an interface
  * whenever the link changes (i.e., link down)
  */
 #define LWIP_NETIF_LINK_CALLBACK        1
-
-#define LWIP_NETIF_HOSTNAME     1
 
 /*
    --------------------------------------
@@ -206,14 +253,10 @@ The STM32F4x7 allows computing and verifying the IP, UDP, TCP and ICMP checksums
 #define LWIP_SOCKET                     0
 
 
-/*
-   ----------------------------------------
-   ---------- Lwip Debug options ----------
-   ----------------------------------------
-*/
-//#define LWIP_DEBUG                      1
 
- 
+#include "lwip/debug.h"
+
+
 #endif /* __LWIPOPTS_H__ */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

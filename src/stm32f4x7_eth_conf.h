@@ -64,7 +64,7 @@
 /* Redefinition of the Ethernet driver buffers size and count */
  #define ETH_RX_BUF_SIZE    ETH_MAX_PACKET_SIZE  /* buffer size for receive */
  #define ETH_TX_BUF_SIZE    ETH_MAX_PACKET_SIZE  /* buffer size for transmit */
- #define ETH_RXBUFNB        4                    /* 4 Rx buffers of size ETH_RX_BUF_SIZE */
+ #define ETH_RXBUFNB        8                    /* 4 Rx buffers of size ETH_RX_BUF_SIZE */
  #define ETH_TXBUFNB        4                    /* 4 Tx buffers of size ETH_TX_BUF_SIZE */
 #endif
 
@@ -105,6 +105,13 @@
 #define PHY_MISR               ((uint16_t)0x12) /* MII Interrupt Status and Misc. Control Register */
 #define PHY_MISR_LINK_INT_EN   ((uint16_t)0x0020) /* Enable Interrupt on change of link status */
 #define PHY_LINK_STATUS        ((uint16_t)0x2000) /* PHY link status interrupt mask */
+
+#define PHY_ADVERTISE          ((uint16_t)0x04)    /* Auto-Negotiate advertisement Register */
+#define PHY_ADVERTISE_10HALF   (uint16_t)0x0020
+#define PHY_ADVERTISE_10FULL   (uint16_t)0x0040
+#define PHY_ADVERTISE_100HALF  (uint16_t)0x0080
+#define PHY_ADVERTISE_100FULL  (uint16_t)0x0100
+#define PHY_ADVERTISE_ALL      (uint16_t)0x01E0
 
    /* Note : Common PHY registers are defined in stm32f4x7_eth.h file */
 

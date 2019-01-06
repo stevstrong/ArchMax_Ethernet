@@ -241,7 +241,7 @@ void DBG_PrintNetif(struct netif* netIf)
 #endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
 #if LWIP_NETIF_HOSTNAME
   /* the hostname for this netif, NULL is a valid value */
-  PRINTF("hostname: %s\n", netIf->state); //  const char*  hostname;
+  PRINTF("hostname: %s\n", netIf->hostname); //  const char*  hostname;
 #endif /* LWIP_NETIF_HOSTNAME */
 #if LWIP_CHECKSUM_CTRL_PER_NETIF
   PRINTF("chksum_flags: %04X\n", netIf->chksum_flags); //  u16_t chksum_flags;

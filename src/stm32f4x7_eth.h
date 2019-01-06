@@ -37,6 +37,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4x7_eth_conf.h"
 
+extern void ETH_Tx_DbgPrint(void);
+extern void ETH_Rx_DbgPrint(void);
+
 /** @addtogroup STM32F4x7_ETH_Driver
   * @{
   */
@@ -298,11 +301,6 @@ typedef struct  {
  #define ETH_RX_BUF_SIZE         ETH_MAX_PACKET_SIZE 
 #endif
 
-/* 5 Ethernet driver receive buffers are used (in a chained linked list)*/ 
-#ifndef ETH_RXBUFNB
- #define ETH_RXBUFNB             5     /*  5 Rx buffers of size ETH_RX_BUF_SIZE */
-#endif
-
 
  /* Ethernet driver transmit buffers are organized in a chained linked-list, when
     an ethernet packet is transmitted, Tx-DMA will transfer the packet from the 
@@ -323,11 +321,6 @@ typedef struct  {
    packet */  
 #ifndef ETH_TX_BUF_SIZE 
  #define ETH_TX_BUF_SIZE         ETH_MAX_PACKET_SIZE
-#endif
-
-/* 5 ethernet driver transmit buffers are used (in a chained linked list)*/ 
-#ifndef ETH_TXBUFNB
- #define ETH_TXBUFNB             5      /* 5  Tx buffers of size ETH_TX_BUF_SIZE */
 #endif
 
 #define  ETH_DMARxDesc_FrameLengthShift           16
@@ -1758,7 +1751,7 @@ typedef struct  {
   * @{
   */ 
 void ETH_DeInit(void);
-uint32_t ETH_Init(ETH_InitTypeDef* ETH_InitStruct, uint16_t PHYAddress);
+uint32_t ETH_Init(ETH_InitTypeDef* ETH_InitStruct);
 void ETH_StructInit(ETH_InitTypeDef* ETH_InitStruct);
 void ETH_SoftwareReset(void);
 FlagStatus ETH_GetSoftwareResetStatus(void);
@@ -1774,9 +1767,9 @@ uint32_t ETH_GetRxPktSize(ETH_DMADESCTypeDef *DMARxDesc);
 /** 
   * @brief  PHY  
   */ 
-uint16_t ETH_ReadPHYRegister(uint16_t PHYAddress, uint16_t PHYReg);
-uint32_t ETH_WritePHYRegister(uint16_t PHYAddress, uint16_t PHYReg, uint16_t PHYValue);
-uint32_t ETH_PHYLoopBackCmd(uint16_t PHYAddress, FunctionalState NewState);
+uint16_t ETH_ReadPHYRegister(uint16_t PHYReg);
+uint32_t ETH_WritePHYRegister(uint16_t PHYReg, uint16_t PHYValue);
+uint32_t ETH_PHYLoopBackCmd(FunctionalState NewState);
 
 /** 
   * @brief  MAC  

@@ -38,6 +38,7 @@
 /* Includes ------------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
+#define MAX_DHCP_TRIES        4
 #define DHCP_START                 1
 #define DHCP_WAIT_ADDRESS          2
 #define DHCP_ADDRESS_ASSIGNED      3
@@ -48,6 +49,7 @@
 void LwIP_Init(void);
 void LwIP_Pkt_Handle(void);
 void LwIP_Periodic_Handle(__IO uint32_t localtime);
+uint32_t LwIP_DHCP_GetAddress(void);
 
 #ifdef __cplusplus
 }

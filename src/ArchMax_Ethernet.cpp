@@ -1,10 +1,10 @@
 
 #include "ArchMax_Ethernet.h"
 #include <wirish_time.h>
+#include "lwip/stats.h"
 
 //-----------------------------------------------------------------------------
-uint32_t LocalTime; /* this variable is used to create a time reference incremented by 10ms */
-
+uint32_t LocalTime; // time reference incremented by 1 ms
 
 //-----------------------------------------------------------------------------
 void ArchMax_Ethernet_Init()
@@ -26,6 +26,8 @@ void ArchMax_Ethernet_Init()
 //-----------------------------------------------------------------------------
 void ArchMax_Ethernet_Loop()
 {
+	ETH_Tx_DbgPrint();
+	ETH_Rx_DbgPrint();
     /* check if any packet received */
     if (ETH_CheckFrameReceived())
     { 
@@ -48,4 +50,3 @@ void Delay(uint32_t nCount)
   /* wait until the desired delay finish */
   while( (millis()-LocalTime)<nCount ) ;
 }
-

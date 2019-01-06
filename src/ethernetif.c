@@ -136,17 +136,22 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
 {
   err_t errval = ERR_OK;
 
-  u8 *buffer =  (u8 *)(DMATxDescToSet->Buffer1Addr);
+//  PRINTF("<low_level_output>\n");
   __IO ETH_DMADESCTypeDef *DmaTxDesc = DMATxDescToSet;
+  u8 *buffer =  (u8 *)(DmaTxDesc->Buffer1Addr);
   uint32_t bufferoffset = 0;
   uint16_t framelength = 0;
+uint8_t desc_cnt = 0;
+uint8_t desc_data_cnt = 0;
 
+	ETH_Tx_DbgPrint();
   /* copy frame from pbufs to driver buffers */
   for(struct pbuf *q = p; q != NULL; q = q->next)
     {
       /* Is this buffer available? If not, goto error */
-      if((DmaTxDesc->Status & ETH_DMATxDesc_OWN) != (u32)RESET)
+      if( (DmaTxDesc->Status & ETH_DMATxDesc_OWN) )
       {
+		PRINTF("---ERR: DmaTx desc %u NOK---\n", desc_cnt);
         errval = ERR_BUF;
         goto error;
       }
@@ -167,6 +172,7 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
         /* Check if the buffer is available */
         if((DmaTxDesc->Status & ETH_DMATxDesc_OWN) != (u32)RESET)
         {
+		  PRINTF("---ERR: DmaTx desc data %u NOK---\n", desc_data_cnt);
           errval = ERR_USE;
           goto error;
         }
@@ -177,17 +183,19 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
         payloadoffset = payloadoffset + (ETH_TX_BUF_SIZE - bufferoffset);
         framelength = framelength + (ETH_TX_BUF_SIZE - bufferoffset);
         bufferoffset = 0;
+	    desc_data_cnt++;
       }
 
       /* Copy the remaining bytes */
       memcpy( (u8_t*)((u8_t*)buffer + bufferoffset), (u8_t*)((u8_t*)q->payload + payloadoffset), byteslefttocopy );
       bufferoffset = bufferoffset + byteslefttocopy;
       framelength = framelength + byteslefttocopy;
+	  desc_cnt++;
     }
-  
+
   /* Note: padding and CRC for transmitted frame 
      are automatically inserted by DMA */
-
+	ETH_Tx_DbgPrint();
   /* Prepare transmit descriptors to give to DMA*/ 
   ETH_Prepare_Transmit_Descriptors(framelength);
 
@@ -218,16 +226,18 @@ static struct pbuf * low_level_input(struct netif *netif)
   /* get received frame */
   FrameTypeDef frame = ETH_Get_Received_Frame();
   
+  __IO ETH_DMADESCTypeDef *DMARxDesc = frame.descriptor;
   /* Obtain the size of the packet and put it into the "len" variable. */
   uint32_t len = frame.length;
   u8 *buffer = (u8 *)frame.buffer;
   
+//  PRINTF("<low_level_input(len=%u)>\n", len);
+  ETH_Rx_DbgPrint();
   /* We allocate a pbuf chain of pbufs from the Lwip buffer pool */
   struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
   
   if (p != NULL)
   {
-    __IO ETH_DMADESCTypeDef *DMARxDesc = frame.descriptor;
     uint32_t bufferoffset = 0;
     for(struct pbuf *q = p; q != NULL; q = q->next)
     {
@@ -252,10 +262,12 @@ static struct pbuf * low_level_input(struct netif *netif)
       memcpy( (u8_t*)((u8_t*)q->payload + payloadoffset), (u8_t*)((u8_t*)buffer + bufferoffset), byteslefttocopy);
       bufferoffset = bufferoffset + byteslefttocopy;
     }
+  } else {
+	PRINTF("---ERR: low_level_input - could not allocate pbuf!---\n");
   }
   
   /* Release descriptors to DMA */
-  __IO ETH_DMADESCTypeDef *DMARxDesc =frame.descriptor;
+  DMARxDesc = frame.descriptor;
 
   /* Set Own bit in Rx descriptors: gives the buffers back to DMA */
   for (uint32_t i=0; i<DMA_RX_FRAME_infos->Seg_Count; i++)
@@ -263,7 +275,6 @@ static struct pbuf * low_level_input(struct netif *netif)
     DMARxDesc->Status = ETH_DMARxDesc_OWN;
     DMARxDesc = (ETH_DMADESCTypeDef *)(DMARxDesc->Buffer2NextDescAddr);
   }
-  
   /* Clear Segment_Count */
   DMA_RX_FRAME_infos->Seg_Count =0;
   
@@ -275,6 +286,7 @@ static struct pbuf * low_level_input(struct netif *netif)
     /* Resume DMA reception */
     ETH->DMARPDR = 0;
   }
+  ETH_Rx_DbgPrint();
   return p;
 }
 
