@@ -6,6 +6,6 @@ The library is based on [STM32070 SW package](https://www.st.com/en/embedded-sof
 
 Update [06.01.2019]
 
-- LwIP upgarded to v2.1.2
+- LwIP upgraded to v2.1.2
 
 Some of the LwIP files are relocated to accomodate with Arduino framework.
