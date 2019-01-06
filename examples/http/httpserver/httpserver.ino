@@ -2,7 +2,7 @@
 // HTTP Server for Arch Max v1.1
 //-----------------------------------------------------------------------------
 
-#include <LwIP2.h>
+#include <ArchMax_Ethernet.h>
 #include "lwip/apps/httpd.h"
 
 //-----------------------------------------------------------------------------
@@ -17,10 +17,6 @@ const uint8_t my_mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 // (port 80 is default for HTTP):
 //EthernetServer server(80);
 
-//#ifdef Serial
-//#undef Serial
-//#define Serial Serial6
-//#endif
 
 #define LED1 LED_BUILTIN
 #define LED2 PC6
@@ -51,7 +47,6 @@ void setup()
   Serial.print("Initializing the HTTP server ... ");
   httpd_init();
   Serial.println("done.");
-  
   
 }
 uint32_t gotIP;
