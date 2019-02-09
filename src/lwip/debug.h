@@ -71,7 +71,7 @@
 #define LWIP_PLATFORM_ERROR(message) LWIP_PLATFORM_DIAG((message))
 #else
 #define LWIP_PLATFORM_ERROR(message)
-#warning LWIP_ERROR is aincative
+#warning LWIP_ERROR is inactive
 #endif
 
 /* if "expression" isn't true, then print "message" and execute "handler" expression */

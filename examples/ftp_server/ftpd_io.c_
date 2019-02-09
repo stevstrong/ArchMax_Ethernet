@@ -1,0 +1,889 @@
+/*
+* Wiznet.
+* (c) Copyright 2002, Wiznet.
+*
+* Filename	: ftpd.c
+* Version	: 1.0
+* Programmer(s)	: 
+* Created	: 2003/01/28
+* Description   : FTP daemon. (AVR-GCC Compiler)
+*/
+
+
+#include "../../Ethernet/socket.h"
+#include "ftpd.h"
+
+//-----------------------------------------------------------------------------
+static uint8_t c_buf[LINELEN] __attribute__ ((aligned)); // command buffer, 256B
+static uint8_t d_buf[_MAX_SS] __attribute__ ((aligned)); // data buffer, 2kB
+#define cbuf   ((char*)c_buf)
+#define dbuf   ((char*)d_buf)
+uint32_t slen;
+int32 ret;
+
+#define SOCK_SEND(...) { \
+	slen = sprintf(dbuf, __VA_ARGS__); \
+	ret = send(CTRL_SOCK, d_buf, slen); }
+		
+#define SEND(...) { \
+	send(DATA_SOCK, d_buf, slen); }
+
+//-----------------------------------------------------------------------------
+
+/* Command table */
+static const char * commands[] = {
+	"user",
+	"acct",
+	"pass",
+	"type",
+	"list",
+	"cwd",
+	"cdup",
+	"dele",
+	"name",
+	"quit",
+	"retr",
+	"stor",
+	"port",
+	"nlst",
+	"pwd",
+	"xpwd",
+	"mkd",
+	"xmkd",
+	"xrmd",
+	"rmd ",
+	"stru",
+	"mode",
+	"syst",
+	"xmd5",
+	"xcwd",
+	"feat",
+	"pasv",
+	"size",
+	"mlsd",
+	"appe",
+	"rnfr",
+	"rnto",
+	NULL
+};
+
+#if 0
+/* Response messages */
+char banner[] = "220 %s FTP version %s ready.\r\n";
+char badcmd[] = "500 Unknown command '%s'\r\n";
+char binwarn[] = "100 Warning: type is ASCII and %s appears to be binary\r\n";
+char unsupp[] = "500 Unsupported command or option\r\n";
+char givepass[] = "331 Enter PASS command\r\n";
+char logged[] = "230 Logged in\r\n";
+char typeok[] = "200 Type %s OK\r\n";
+char only8[] = "501 Only logical bytesize 8 supported\r\n";
+char deleok[] = "250 File deleted\r\n";
+char mkdok[] = "200 MKD ok\r\n";
+char delefail[] = "550 Delete failed: %s\r\n";
+char pwdmsg[] = "257 \"%s\" is current directory\r\n";
+char badtype[] = "501 Unknown type \"%s\"\r\n";
+char badport[] = "501 Bad port syntax\r\n";
+char unimp[] = "502 Command not implemented yet.\r\n";
+char bye[] = "221 Goodbye!\r\n";
+char nodir[] = "553 Can't read directory \"%s\": %s\r\n";
+char cantopen[] = "550 Can't read file \"%s\": %s\r\n";
+char sending[] = "150 Opening data connection for %s (%d.%d.%d.%d,%d)\r\n";
+char cantmake[] = "553 Can't create \"%s\": %s\r\n";
+char writerr[] = "552 Write error: %s\r\n";
+char portok[] = "200 PORT command successful.\r\n";
+char rxok[] = "226 Transfer complete.\r\n";
+char txok[] = "226 Transfer complete.\r\n";
+char noperm[] = "550 Permission denied\r\n";
+char noconn[] = "425 Data connection reset\r\n";
+char lowmem[] = "421 System overloaded, try again later\r\n";
+char notlog[] = "530 Please log in with USER and PASS\r\n";
+char userfirst[] = "503 Login with USER first.\r\n";
+char okay[] = "200 Ok\r\n";
+char syst[] = "215 %s Type: L%d Version: %s\r\n";
+char sizefail[] = "550 File not found\r\n";
+#endif
+
+ip_addr remote_ip;
+ip_addr local_ip;
+uint16_t  remote_port;
+uint16_t  local_port;
+uint8_t connect_state_control = 0;
+//uint8_t connect_state_data = 0;
+
+uint8_t CTRL_SOCK;
+uint8_t DATA_SOCK;
+
+struct ftpd ftp[MAX_SOCK];
+
+int current_year = 2018;
+int current_month = 9;
+int current_day = 18;
+int current_hour = 22;
+int current_min = 10;
+int current_sec = 30;
+
+//-----------------------------------------------------------------------------
+void errorPrint(const char* msg) {
+  sd.errorPrint(msg);
+}
+
+//-----------------------------------------------------------------------------
+void ftpd_init(ip_addr * src_ip)
+{
+	for (uint8_t sock=FTP_SOCK0; sock<MAX_SOCK; sock++)
+	{
+		ftp[sock].state = FTPS_NOT_LOGIN;
+		ftp[sock].current_cmd = NO_CMD;
+		ftp[sock].cs_state = SOCK_CLOSED;
+		ftp[sock].ds_state = SOCK_CLOSED;
+		ftp[sock].dsock_state = FTPSOCK_CLOSE;
+		ftp[sock].dsock_mode = ACTIVE_MODE;
+		ftp[sock].workingdir[0] = '/';
+		ftp[sock].workingdir[1] = 0;
+	}
+	// values needed for PASV command
+	local_port = 35000;
+	local_ip.dword = *(uint32_t*)src_ip;
+#if defined(F_FILESYSTEM)
+	// set date time callback function
+	SdFile::dateTimeCallback(FS_DateTime);
+#endif
+}
+//-----------------------------------------------------------------------------
+//uint32_t t;
+//uint8_t old_snSR[MAX_SOCK];
+//-----------------------------------------------------------------------------
+void ftpd_check_cmd(void)
+{
+	uint8_t snSR = getSn_SR(CTRL_SOCK);
+	uint8_t old_state = ftp[CTRL_SOCK].cs_state;
+	ftp[CTRL_SOCK].cs_state = snSR;
+	uint8_t chg = ( old_state!=snSR ) ? 1 : 0;
+//	if ( ((millis()-t)>10000) || dbg )
+//	{
+//		t = millis();
+//		PRINTF("%d:> CTRL socket old status: 0x%X, new status: 0x%X, state: %d\n", CTRL_SOCK, old_snSR[CTRL_SOCK], snSR, ftp[CTRL_SOCK].csock_state);
+//		//dbg = 0;
+//	}
+	// check control socket
+    switch(snSR)
+    {
+    	case SOCK_ESTABLISHED:
+		{
+   			if(chg)
+    		{
+    			PRINTF("%d: CTRL sock connected\n", CTRL_SOCK);
+    			SOCK_SEND("220 %s FTP version %s ready.\r\n", HOSTNAME, VERSION);
+    			if(ret < 0) // the result of SOCK_SEND
+    			{
+    				PRINTF("%d: CTRL sock send() error:%d\n", CTRL_SOCK, ret);
+    				close(CTRL_SOCK);
+    				return;
+    			}
+     		}
+
+			int16 size = getSn_RX_RSR(CTRL_SOCK);
+    		if (size > 0) // Don't need to check SOCKERR_BUSY because it doesn't not occur.
+    		{
+    			ret = recv(CTRL_SOCK, c_buf, size);
+
+				//PRINTF("CTRL sock Rx: %d\r\n", ret);
+    			cbuf[ret] = '\0';
+    			if(ret != size)
+    			{
+    				if(ret==SOCK_BUSY)
+					{
+    					PRINTF("%d: CTRL sock BUSY, size: %d, ret: %d\n", CTRL_SOCK, size, ret);
+						return;
+					}
+    				if(ret < 0)
+    				{
+    					PRINTF("%d: CTRL sock recv() error: %d, closing.\n", CTRL_SOCK, ret);
+    					close(CTRL_SOCK);
+    					return;
+    				}
+    			}
+    			ftpd_proc();
+    		}
+    		break;
+		}
+    	case SOCK_LISTEN:
+			if (chg) {
+				PRINTF("%d: CTRL sock listening\n", CTRL_SOCK);
+			}
+    		break;
+
+    	case SOCK_INIT:
+			PRINTF("%d: CTRL sock opened\n", CTRL_SOCK);
+    		if( (ret = listen(CTRL_SOCK)) != SOCK_OK)
+    		{
+    			PRINTF("%d: CTRL sock listen error!\n",CTRL_SOCK);
+    			return;
+    		}
+			break;
+
+    	case SOCK_CLOSE_WAIT:
+    		PRINTF("%d: CTRL sock close wait\n", CTRL_SOCK);
+    		disconnect(CTRL_SOCK);
+    		break;
+
+    	case SOCK_CLOSED:
+		{
+			PRINTF("%d: CTRL sock closed\n", CTRL_SOCK);
+			// open socket
+			if( (ret=socket(CTRL_SOCK, Sn_MR_TCP, IPPORT_FTP, 0x0)) != CTRL_SOCK )
+			{
+				PRINTF("%d: CTRL sock open error: %d\n", CTRL_SOCK, ret);
+				close(CTRL_SOCK);
+				return;
+			}
+   			break;
+		}
+    	default:
+    		break;
+    }
+}
+//-----------------------------------------------------------------------------
+uint8_t ftpd_check_data(void)
+{
+	uint8_t snSR = getSn_SR(DATA_SOCK);
+	uint8_t old_state = ftp[CTRL_SOCK].ds_state;
+	ftp[CTRL_SOCK].ds_state = snSR;
+	uint8_t chg = ( old_state!=snSR ) ? 1 : 0;
+    switch(snSR)
+    {
+   		case SOCK_CLOSE_WAIT :
+   			PRINTF("%d: DATA sock close wait\n", DATA_SOCK);
+   			if((ret=disconnect(DATA_SOCK)) != SOCK_OK)
+			{
+				PRINTF("%d: DATA sock disconnect error!\n", DATA_SOCK);
+				return ret;
+			}
+   			break;
+
+   		case SOCK_CLOSED :
+   			if (chg) {
+				PRINTF("%d: DATA sock closed.\n", DATA_SOCK);
+			}
+   			if(ftp[CTRL_SOCK].dsock_state == FTPSOCK_OPEN)
+   			{
+   				if(ftp[CTRL_SOCK].dsock_mode == PASSIVE_MODE)
+				{
+   					PRINTF("%d: DATA sock start, port : %d\n", DATA_SOCK, local_port);
+   					if((ret=socket(DATA_SOCK, Sn_MR_TCP, local_port, 0x0)) != DATA_SOCK)
+   					{
+   						PRINTF("%d: DATA sock open error:%i\n", DATA_SOCK, ret);
+   						close(DATA_SOCK);
+   						return ret;
+   					}
+   					if( (++local_port) >= 50000)
+   						local_port = 35000;
+   				} else {
+					PRINTF("%d: DATA socket start, port : %d\r\n", DATA_SOCK, IPPORT_FTPD);
+   					if((ret=socket(DATA_SOCK, Sn_MR_TCP, IPPORT_FTPD, 0x0)) != DATA_SOCK)
+   					{
+   						PRINTF("%d: DATA sock open error:%d\n", DATA_SOCK, ret);
+   						close(DATA_SOCK);
+   						return ret;
+   					}
+   				}
+				ftp[CTRL_SOCK].dsock_state = FTPSOCK_ACTIVE;
+   			}
+   			break;
+
+   		case SOCK_INIT :
+   			if (chg) {
+				PRINTF("%d: DATA sock opened\n",DATA_SOCK);
+			}
+   			if(ftp[CTRL_SOCK].dsock_mode == PASSIVE_MODE)
+			{
+   				if( (ret = listen(DATA_SOCK)) != SOCK_OK)
+   				{
+   					PRINTF("%d: DATA sock listen error!\n", DATA_SOCK);
+   					return ret;
+   				}
+   			} else {
+   				if((ret = connect(DATA_SOCK, &remote_ip, remote_port)) != SOCK_OK){
+   					PRINTF("%d: DATA sock connect error!\n", DATA_SOCK);
+   					return ret;
+   				}
+   			}
+   			break;
+
+//    	case SOCK_LISTEN :
+//   			if(chg) {
+//   				PRINTF("%d: DATA sock listen\n",DATA_SOCK);
+//			}
+//   			break;
+
+    	case SOCK_ESTABLISHED :
+   			if(chg) {
+    			PRINTF("%d: DATA socket connected\n", DATA_SOCK);
+     		}
+			// execute additional command if needed
+			if (ftp[CTRL_SOCK].current_cmd!=NO_CMD )
+			{
+				void ftpd_cmd();
+				ftpd_cmd();
+				ftp[CTRL_SOCK].current_cmd = NO_CMD;
+			}
+   			break;
+
+   		default :
+   			break;
+    }
+
+    return 0;
+}
+
+//-----------------------------------------------------------------------------
+void ftpd_run(void)
+{
+	uint8_t sock = FTP_SOCK0;
+	while (sock<MAX_SOCK)
+	{
+		CTRL_SOCK = sock;
+		DATA_SOCK = sock+MAX_SOCK;
+		ftpd_check_cmd();
+		ftpd_check_data();
+		sock++;
+	}
+}
+//-----------------------------------------------------------------------------
+void ftpd_cmd(void)
+{
+	uint8_t cmd = ftp[CTRL_SOCK].current_cmd;
+	PRINTF("%d: ftpd_cmd: %s\n", DATA_SOCK, commands[cmd]);
+	// update working directory
+	FS_ChangeDir(ftp[CTRL_SOCK].workingdir);
+	switch(cmd)
+	{
+		case LIST_CMD:
+		case MLSD_CMD:
+			//PRINTF("previous size: %d\r\n", size);
+			uint16 size;
+#if defined(F_FILESYSTEM)
+			FS_ListDir(ftp[CTRL_SOCK].workingdir, dbuf, &size);
+#else
+			//if (strncmp(ftp.workingdir, "/$Recycle.Bin", sizeof("/$Recycle.Bin")) != 0)
+			{
+				//size = sprintf((char*)dbuf, "drwxr-xr-x 1 ftp ftp 0 Dec 31 2014 $Recycle.Bin\r\n-rwxr-xr-x 1 ftp ftp 512 Dec 31 2014 test.txt\r\n");
+				size = sprintf((dbuf, "-rwxr-xr-x 1 ftp ftp 512 DEC 31 2014 test.txt\r\n", ftp[CTRL_SOCK].filename);
+			}
+#endif
+			if ( size )
+			{
+				PRINTF("%s", d_buf);
+				//size = strlen((const char*)dbuf);
+				send(DATA_SOCK, d_buf, size);
+			}
+			disconnect(DATA_SOCK);
+			SOCK_SEND("226 Successfully transferred \"%s\"\r\n", ftp[CTRL_SOCK].workingdir);
+			break;
+
+		case RETR_CMD:
+		{
+			PRINTF("RETR_CMD \"%s\"\n", ftp[CTRL_SOCK].filename);
+#if defined(F_FILESYSTEM)
+			//int16 res = file.open(ftp.filename, O_READ);
+			int16_t txMax = getSn_TxMAX(DATA_SOCK); //_MAX_SS;
+			uint32_t remain_filesize = FS_OpenFile(ftp[CTRL_SOCK].filename, O_READ); // returns the file size
+			PRINTF("transferring %lu bytes ", remain_filesize);
+			while(remain_filesize > 0)
+			{
+				//remain_filesize = file.fileSize();
+				int16 send_size = txMax;
+				if((uint16_t)send_size > remain_filesize)
+					send_size = remain_filesize;
+
+				send_size = file.read(d_buf, send_size);
+				//PRINTF("_%i_", send_size);
+				if(send_size<=0)
+					break;
+				PRINTF(".");
+				ret = send(DATA_SOCK, d_buf, send_size);
+				if (ret<=0) PRINTF("%d:socket send error: %i\n", DATA_SOCK, ret);
+				remain_filesize -= send_size;
+			}
+			PRINTF("\ndone.\n");
+			file.close();
+#else
+			uint32_t remain_filesize = strlen(ftp[CTRL_SOCK].filename);
+
+			while(remain_filesize>0)
+			{
+				//memset(dbuf, 0, _MAX_SS);
+				int16 send_byte = sprintf(dbuf, "%s", ftp[CTRL_SOCK].filename);
+
+				PRINTF("### dbuf:%s\n", dbuf);
+
+				send(DATA_SOCK, d_buf, send_byte);
+				remain_filesize -= send_byte;
+			}
+
+#endif
+			disconnect(DATA_SOCK);
+			SOCK_SEND("226 Successfully transferred \"%s\"\r\n", ftp[CTRL_SOCK].filename);
+			break;
+		}
+		case STOR_CMD:
+		{
+			PRINTF("STOR_CMD \"%s\"\n", ftp[CTRL_SOCK].filename);
+#if defined(F_FILESYSTEM)
+			//ftp.fr = f_open(&(ftp.fil), (const char *)ftp.filename, FA_CREATE_ALWAYS | FA_WRITE);
+			PRINTF("opening file ");
+			ret = file.open((const char *)ftp[CTRL_SOCK].filename, (O_CREAT | O_WRITE | O_TRUNC));
+			//print_filedsc(&(ftp.fil));
+			if(ret)
+			{
+				PRINTF("done.\nwriting data to file...");
+				uint32_t t = millis();
+				while(1)
+				{
+					int16_t recv_byte;
+					// wait receive data
+					while ( (recv_byte = recv(DATA_SOCK, d_buf, _MAX_SS)) <= 0 )
+					{
+						if ( recv_byte==SOCKERR_SOCKSTATUS )
+						{
+							//PRINTF("\n%d:socket closed\n", DATA_SOCK);
+							break;
+						}
+						if ((millis()-t)>500) // wait for Rx data
+						{
+							PRINTF("\n%d:_TIMEOUT_Rx_\n", DATA_SOCK);
+							break;
+						}
+					}
+					if ( (recv_byte==SOCKERR_SOCKSTATUS) ) break;
+
+					ret = file.write(d_buf, recv_byte);
+					if(ret<0){
+						PRINTF("file.write failed!\n");
+						break;
+					}
+					//PRINTF(".");
+					t = millis(); // reset timeout counter
+				}
+				PRINTF("done.\n");
+			} else {
+				PRINTF("failed!\n");
+				sd.errorPrint();
+			}
+			PRINTF("closing file.\n");
+			file.close();
+
+#else
+			while(1)
+			{
+				uint32_t remain_datasize;
+				if((remain_datasize = getSn_RX_RSR(DATA_SOCK)) > 0)
+				{
+					while(remain_datasize>0)
+					{
+						//memset(dbuf, 0, _MAX_SS);
+
+						uint16_t recv_byte;
+						if(remain_datasize > _MAX_SS)
+							recv_byte = _MAX_SS;
+						else
+							recv_byte = remain_datasize;
+
+						ret = recv(DATA_SOCK, d_buf, recv_byte);
+
+						PRINTF("##### dbuf:%s\r\n", dbuf);
+
+						remain_datasize -= ret;
+					}
+				}else{
+					if(getSn_SR(DATA_SOCK) != SOCK_ESTABLISHED)
+						break;
+				}
+			}
+#endif
+			disconnect(DATA_SOCK);
+			SOCK_SEND("226 Successfully transferred \"%s\"\r\n", ftp[CTRL_SOCK].filename);
+			break;
+		}
+		case NO_CMD:
+		default:
+			break;
+	}
+}
+//-----------------------------------------------------------------------------
+void ftpd_proc(void)
+{
+	PRINTF(">>> %s", cbuf);
+	char * cp;
+	// Translate first word to lower case
+	for (cp=cbuf; *cp>' '; cp++)
+		*cp = tolower(*cp);
+
+	const char **cmdp;
+	// Find command in table; if not present, return syntax error
+	for (cmdp = commands; *cmdp != NULL; cmdp++)
+		if (strncmp(*cmdp, cbuf, strlen(*cmdp)) == 0)
+			break;
+
+	if (*cmdp == NULL)
+	{
+		*cp = 0;
+		//PRINTF(CTRL_SOCK, badcmd, buf);
+		SOCK_SEND("500 Unknown command \"%s\".\r\n", cbuf);
+		return;
+	}
+	/* Allow only USER, PASS and QUIT before logging in */
+	if (ftp[CTRL_SOCK].state == FTPS_NOT_LOGIN)
+	{
+		switch(cmdp - commands)
+		{
+			case USER_CMD:
+			case PASS_CMD:
+			case QUIT_CMD:
+				break;
+			default:
+				//fsprintf(CTRL_SOCK, notlog);
+				SOCK_SEND("530 Please first login with USER and PASS\r\n");
+				return;
+		}
+	}
+	
+	char * arg = cp;
+	while(*arg == ' ') arg++;
+	// trim the end of arg
+	char * p = arg;
+	while(*p>=' ') p++;
+	*p = 0;
+
+	/* Execute specific command */
+	switch (cmdp - commands)
+	{
+		case USER_CMD :
+			arg[sizeof(ftp[CTRL_SOCK].username)-1] = 0; // avoid overflow
+			strcpy(ftp[CTRL_SOCK].username, arg);
+			SOCK_SEND("331 Enter PASS command\r\n");
+			PRINTF("***** USER %s *****\n", arg);
+			if(ret < 0)
+			{
+				close(CTRL_SOCK);
+				PRINTF("%d:send error:%d\r\n", CTRL_SOCK, ret);
+				return;
+			}
+			break;
+
+		case PASS_CMD :
+			PRINTF("PASS_CMD : %s\n", arg);
+			ftplogin(arg);
+			break;
+
+		case TYPE_CMD :
+			switch(arg[0])
+			{
+				case 'A':
+				case 'a':	/* Ascii */
+					ftp[CTRL_SOCK].type = ASCII_TYPE;
+					SOCK_SEND("200 Type set to %s\r\n", arg);
+					PRINTF("Type set to ASCII.\n");
+					break;
+
+				case 'B':
+				case 'b':	/* Binary */
+				case 'I':
+				case 'i':	/* Image */
+					ftp[CTRL_SOCK].type = IMAGE_TYPE;
+					SOCK_SEND("200 Type set to %s\r\n", arg);
+					PRINTF("Type set to BINARY.\n");
+					break;
+
+				default:	/* Invalid */
+					SOCK_SEND("501 Unknown type \"%s\"\r\n", arg);
+					PRINTF("Unknown type.");
+					break;
+			}
+			break;
+
+		case FEAT_CMD :
+			SOCK_SEND("211-Features:\r\n SIZE\r\n MLST\r\n MLSD\r\n211 END\r\n");
+			PRINTF("FEAT_CMD\n");
+			break;
+
+		case QUIT_CMD :
+			SOCK_SEND("221 Goodbye!\r\n");
+			PRINTF("QUIT_CMD\n");
+			disconnect(CTRL_SOCK);
+			break;
+
+		case RETR_CMD :
+			arg[sizeof(ftp[CTRL_SOCK].filename)-1] = 0; // avoid overflow
+			strcpy(ftp[CTRL_SOCK].filename, arg);
+			SOCK_SEND("150 Preparing to retrieve \"%s\"\r\n", ftp[CTRL_SOCK].filename);
+			ftp[CTRL_SOCK].current_cmd = RETR_CMD;
+			break;
+
+		case APPE_CMD :
+		case STOR_CMD:
+			//PRINTF("STOR_CMD %s\n", arg);
+			arg[sizeof(ftp[CTRL_SOCK].filename)-1] = 0; // avoid overflow
+			strcpy(ftp[CTRL_SOCK].filename, arg);
+			SOCK_SEND("150 Preparing to store \"%s\"\r\n", ftp[CTRL_SOCK].filename);
+			ftp[CTRL_SOCK].current_cmd = STOR_CMD;
+			break;
+
+		case PORT_CMD:
+			PRINTF("PORT_CMD %s\n", arg);
+			if (pport(arg) == -1){
+				//fsprintf(CTRL_SOCK, badport);
+				SOCK_SEND("501 Bad port syntax\r\n");
+			} else{
+				//fsprintf(CTRL_SOCK, portok);
+				ftp[CTRL_SOCK].dsock_state = FTPSOCK_OPEN;
+				ftp[CTRL_SOCK].dsock_mode = ACTIVE_MODE;
+				SOCK_SEND("200 PORT command successful.\r\n");
+			}
+			break;
+
+		case MLSD_CMD:
+			PRINTF("MLSD_CMD\n");
+			SOCK_SEND("150 Preparing to list directory \"%s\"\r\n", ftp[CTRL_SOCK].workingdir);
+			ftp[CTRL_SOCK].current_cmd = MLSD_CMD;
+			break;
+
+		case LIST_CMD:
+			PRINTF("LIST_CMD\n");
+			SOCK_SEND("150 Preparing to list directory \"%s\"\r\n", ftp[CTRL_SOCK].workingdir);
+			ftp[CTRL_SOCK].current_cmd = LIST_CMD;
+			break;
+
+		case SYST_CMD:
+			SOCK_SEND("215 UNIX emulated by WIZnet\r\n");
+			break;
+
+		case PWD_CMD:
+		case XPWD_CMD:
+			SOCK_SEND("257 \"%s\" is current directory.\r\n", ftp[CTRL_SOCK].workingdir);
+			break;
+
+		case PASV_CMD:
+			SOCK_SEND("227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)\r\n",
+				local_ip.bytes[0], local_ip.bytes[1], local_ip.bytes[2], local_ip.bytes[3], local_port >> 8, local_port & 0x00ff);
+			disconnect(DATA_SOCK);
+			ftp[CTRL_SOCK].dsock_state = FTPSOCK_OPEN;
+			ftp[CTRL_SOCK].dsock_mode = PASSIVE_MODE;
+			PRINTF("PASV port: %d\r\n", local_port);
+		break;
+
+		case SIZE_CMD:
+#if defined(F_FILESYSTEM)
+			slen = FS_GetFileSize(arg);
+#else
+			slen = strlen(dbuf);
+#endif
+			PRINTF("SIZE of \"%s\" is %lu.\n", arg, slen);
+			if(slen >= 0)
+				slen = sprintf(dbuf, "213 %lu\r\n", slen);
+			else
+				slen = sprintf(dbuf, "550 File not Found\r\n");
+			send(CTRL_SOCK, d_buf, slen);
+			break;
+
+		case CWD_CMD:
+		{
+			PRINTF("CWD \"%s\", cwd \"%s\".\n", arg, ftp[CTRL_SOCK].workingdir);
+			
+			if ( (*arg=='.') && (*(arg+1)=='.') ) // CDUP
+			{
+				char * p = strrchr(ftp[CTRL_SOCK].workingdir, '/');
+				if ( p==ftp[CTRL_SOCK].workingdir ) p++;
+				*p = 0;
+			} else {
+				if ( *arg=='/') { // absolute path
+					arg[sizeof(ftp[CTRL_SOCK].workingdir)-1] = 0; // avoid overflow
+					strcpy(ftp[CTRL_SOCK].workingdir, arg);
+				} else { // relative path
+					if (ftp[CTRL_SOCK].workingdir[1]!=0) *(--arg) = '/';
+					strcat(ftp[CTRL_SOCK].workingdir, arg);
+				}
+			}
+
+			if ( FS_ChangeDir(ftp[CTRL_SOCK].workingdir) ) {
+				slen = sprintf(dbuf, "250 Working directory changed to \"%s\".\r\n", ftp[CTRL_SOCK].workingdir);
+			} else {
+				slen = sprintf(dbuf, "550 Working directory could not be changed to \"%s\".\r\n", ftp[CTRL_SOCK].workingdir);
+			}
+			send(CTRL_SOCK, d_buf, slen);
+			break;
+		}
+
+		case CDUP_CMD:
+		{
+			PRINTF("CDUP_CMD, cwd: \"%s\".\n", ftp[CTRL_SOCK].workingdir);
+			char * p = strrchr(ftp[CTRL_SOCK].workingdir, '/');
+			if ( p==ftp[CTRL_SOCK].workingdir ) p++;
+			*p = 0;
+
+			if ( FS_ChangeDir(ftp[CTRL_SOCK].workingdir) ) {
+				slen = sprintf(dbuf, "250 Working directory changed to \"%s\".\r\n", ftp[CTRL_SOCK].workingdir);
+			} else {
+				slen = sprintf(dbuf, "550 Working directory could not be changed to \"%s\".\r\n", ftp[CTRL_SOCK].workingdir);
+			}
+			send(CTRL_SOCK, d_buf, slen);
+			break;
+		}
+		case MKD_CMD:
+		case XMKD_CMD:
+			PRINTF("make dir: \"%s\"\n", arg);
+			//slen = strlen(arg);
+#if defined(F_FILESYSTEM)
+			if (!sd.mkdir(arg)) {
+				slen = sprintf(dbuf, "550 Can't create directory. \"%s\"\r\n", arg);
+			} else {
+				slen = sprintf(dbuf, "257 MKD command successful. \"%s\"\r\n", arg);
+			}
+#else
+			slen = sprintf(dbuf, "550 Can't create directory. Permission denied\r\n");
+#endif
+			send(CTRL_SOCK, d_buf, slen);
+			break;
+
+		case DELE_CMD:
+			PRINTF("removing file %s\n", arg);
+#if defined(F_FILESYSTEM)
+			if (!sd.remove(arg) != 0) {
+				slen = sprintf(dbuf, "550 Could not delete \"%s\".\r\n", arg);
+			} else {
+				slen = sprintf(dbuf, "250 Deleted file \"%s\".\r\n", arg);
+			}
+#else
+			slen = sprintf(dbuf, "550 Could not delete. Permission denied\r\n");
+#endif
+			send(CTRL_SOCK, d_buf, slen);
+			break;
+
+		case XRMD_CMD:
+		case RMD_CMD:
+			PRINTF("removing directory %s\n", arg);
+#if defined(F_FILESYSTEM)
+			if (!sd.rmdir(arg) != 0) {
+				slen = sprintf(dbuf, "550 Could not delete \"%s\".\r\n", arg);
+			} else {
+				slen = sprintf(dbuf, "250 Deleted directory \"%s\".\r\n", arg);
+			}
+#else
+			slen = sprintf(dbuf, "550 Could not delete. Permission denied\r\n");
+#endif
+			send(CTRL_SOCK, d_buf, slen);
+			break;
+
+		// C> RNFR mlst.c
+		// S> 350 File exists, ready for destination name
+		// C> RNTO list.c
+		// S> 250 RNTO command successful.
+		case RNFR_CMD:
+#if defined(F_FILESYSTEM)
+			PRINTF("rename from \"%s\"\n", arg);
+			if ( !sd.exists(arg) ) {
+				PRINTF("> rename failed!\n");
+				SOCK_SEND("550 File does not exist \"%s\"\r\n", arg);
+			} else {
+				strncpy(ftp[CTRL_SOCK].filename, arg, sizeof(ftp[CTRL_SOCK].filename));
+				SOCK_SEND("350 File exists, ready for destination name\r\n");
+			}
+#else
+			SOCK_SEND("502 Command is not implemented yet.\r\n");
+#endif
+			break;
+
+		case RNTO_CMD:
+#if defined(F_FILESYSTEM)
+			PRINTF("rename to \"%s\"\n", arg);
+			if ( !sd.rename(ftp[CTRL_SOCK].filename, arg) ) {
+				PRINTF("> rename failed!\n");
+				SOCK_SEND("550 File rename to \"%s\" failed!\r\n", arg);
+			} else {
+				SOCK_SEND("250 File rename successful.\r\n");
+			}
+#else
+			SOCK_SEND("502 Command is not implemented yet.\r\n");
+#endif
+			break;
+
+		case XCWD_CMD:
+		case ACCT_CMD:
+		case STRU_CMD:
+		case MODE_CMD:
+		case XMD5_CMD:
+			//fsprintf(CTRL_SOCK, unimp);
+			SOCK_SEND("502 Command is not implemented yet.\r\n");
+			break;
+
+		default:	/* Invalid */
+			PRINTF("%d: Unknown command argument: \"%s\".\n", CTRL_SOCK, arg);
+			SOCK_SEND("500 Unknown command argument: \"%s\".\r\n", arg);
+			break;
+	}
+}
+
+//-----------------------------------------------------------------------------
+char ftplogin(char * pass)
+{
+	PRINTF("%s logged in\r\n", ftp[CTRL_SOCK].username);
+	//fsprintf(CTRL_SOCK, logged);
+	SOCK_SEND("230 Logged in\r\n");
+	ftp[CTRL_SOCK].state = FTPS_LOGIN;
+	ftp[CTRL_SOCK].workingdir[0] = '/';
+	ftp[CTRL_SOCK].workingdir[1] = 0;
+	//strcpy(ftp.workingdir, "/");
+	FS_ChangeDir(ftp[CTRL_SOCK].workingdir);
+	return 1;
+}
+
+//-----------------------------------------------------------------------------
+int pport(char * arg)
+{
+	int i;
+	char* tok=0;
+
+	for (i = 0; i < 4; i++)
+	{
+		if(i==0) tok = strtok(arg,",\r\n");
+		else	 tok = strtok(NULL,",");
+		remote_ip.bytes[i] = (uint8_t)atoi(tok);//, 10);
+		if (!tok)
+		{
+			PRINTF("bad pport : %s\r\n", arg);
+			return -1;
+		}
+	}
+	remote_port = 0;
+	for (i = 0; i < 2; i++)
+	{
+		tok = strtok(NULL,",\r\n");
+		remote_port <<= 8;
+		remote_port += atoi(tok);//, 10);
+		if (!tok)
+		{
+			PRINTF("bad pport : %s\r\n", arg);
+			return -1;
+		}
+	}
+	PRINTF("ip : %d.%d.%d.%d, port : %d\r\n", remote_ip.bytes[0], remote_ip.bytes[1], remote_ip.bytes[2], remote_ip.bytes[3], remote_port);
+
+	return 0;
+}
+
+#if 0 //defined(F_FILESYSTEM)
+void print_filedsc(FIL *fil)
+{
+	PRINTF("File System pointer : %08X\r\n", fil->fs);
+	PRINTF("File System mount ID : %d\r\n", fil->id);
+	PRINTF("File status flag : %08X\r\n", fil->flag);
+	PRINTF("File System pads : %08X\r\n", fil->err);
+	PRINTF("File read write pointer : %08X\r\n", fil->fptr);
+	PRINTF("File size : %08X\r\n", fil->fsize);
+	PRINTF("File start cluster : %08X\r\n", fil->sclust);
+	PRINTF("current cluster : %08X\r\n", fil->clust);
+	PRINTF("current data sector : %08X\r\n", fil->dsect);
+	PRINTF("dir entry sector : %08X\r\n", fil->dir_sect);
+	PRINTF("dir entry pointer : %08X\r\n", fil->dir_ptr);
+}
+#endif

@@ -1,0 +1,267 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<link rel="File-List" href="STM32F4x7_files/filelist.xml">
+<link rel="Edit-Time-Data" href="STM32F4x7_files/editdata.mso">
+<title>STM32F4x7</title>
+<style>
+.tab {
+	#overflow: hidden; 
+	#border: 1px solid #ccc;
+	border-bottom: none;
+	#background-color: #f1f1f1;
+	text-align: center;
+	background: white none repeat scroll 0% 50%
+}
+.tab button {
+	width: 320px;
+	#background-color: inherit;
+	background: rgb(51, 51, 255) none repeat scroll 0% 50%;
+	#float: left;
+	#border: 2px solid white;
+	outline: none;
+	cursor: pointer;
+	#padding: 14px 16px;
+	padding: 1.5pt;
+	transition: 0.2s;
+	#font-size: 17px;
+	font-size: 11pt;
+	font-family: Verdana;
+	font-weight: bold;
+	font-style: italic;
+	color: white;
+}
+.tab button:hover {background-color: #88F;}
+.tab button.active {background-color: #008;}
+.tabcontent {
+	display: none;
+	padding: 6px 12px;
+	#border: 1px solid #ccc;
+	border-top: none;
+	height: 550px;
+}
+.txt {
+	font-size: 10pt;
+	font-family: Verdana;
+	line-height: 1.3;
+}
+</style>
+<script>
+function openTab(evt, tabName) {
+  // Get all elements with class="tabcontent" and hide them
+  var tabcontent = document.getElementsByClassName("tabcontent");
+  for (i = 0; i < tabcontent.length; i++) {
+    tabcontent[i].style.display = "none";
+  }
+  // Get all elements with class="tablinks" and remove the class "active"
+  var tablinks = document.getElementsByClassName("tablinks");
+  for (var i = 0; i < tablinks.length; i++) {
+    tablinks[i].className = tablinks[i].className.replace(" active", "");
+  }
+  evt.currentTarget.className += " active";
+  // Show the current tab, and add an "active" class to the button that opened the tab
+  document.getElementById(tabName).style.display = "block";
+} 
+</script>
+</head>
+<body style="" lang="EN-US" link="blue" vlink="blue">
+<div class="Section1" style="margin-left: 30pt;">
+<p class="MsoNormal" style="text-align: center;" align="center"><img alt="" id="_x0000_i1025" src="/files/ST.gif" style="border: 0px solid ; width: 766px; height: 58px;"><b><i><span style="font-size: 24pt;"><br>
+<strong>STM32F4x7 Webserver Demo</strong></span></i></b><b><span style="font-size: 18pt; font-family: Verdana; color: rgb(51, 51, 255);"><br>
+Based on the LwIP TCP/IP stack </span></b></p>
+<div class="MsoNormal" style="text-align: center;" align="center">
+<hr align="center" size="2" width="100%"></div>
+<div class="tab">
+  <button class="tablinks" onclick="openTab(event, 'HomePage')" id="defaultOpen">Home page</button>
+  <button class="tablinks" onclick="openTab(event, 'LED')">Led control</button>
+  <button class="tablinks" onclick="openTab(event, 'ADC')">ADC status bar</button>
+</div>
+
+<div id="HomePage" align="center" class="tabcontent">
+<table class="MsoNormalTable" style="background: white none repeat scroll 0% 50%; -moz-background-clip: initial; -moz-background-origin: initial; -moz-background-inline-policy: initial; width: 574.5pt;" border="0" cellpadding="0" cellspacing="0" width="766">
+<tbody>
+<tr style="">
+<td style="padding: 0cm;" valign="top">
+<table class="MsoNormalTable" style="width: 100%;" border="0" cellpadding="0" cellspacing="0" width="100%">
+<tbody>
+<tr>
+<td style="padding: 2.25pt;">
+<table border="0" cellpadding="3" cellspacing="0" width="100%">
+<tbody>
+<tr>
+<td valign="top" width="72%">
+<h1><span style="color: rgb(51, 51, 255);">STM32 - F4 Series</span></h1>
+<p class="txt">A new generation on STM32 with significant improvement in features / performance:<o:p></o:p></span></p>
+<ul type="disc">
+<li class="txt">More Memory<o:p></o:p></span></li>
+<li class="txt">Advanced features<o:p></o:p></span></li>
+<li class="txt">Maintain close pin-out compatibility<o:p></o:p></span></li>
+<li class="txt">Maintain close software compatibility<o:p></o:p></span></li>
+</ul>
+<span class="txt">Complement the existing family with more performance, memory and features<br><br>
+<a style="font-weight: bold;" href="http://www.st.com/internet/mcu/class/1734.jsp" target="_blank">The STM32F4x7 home page</a></span></td>
+<td width="2%"></td>
+<td align="right" valign="top" width="26%"><br><br>
+<img style="width: 322px; height: 213px;" alt="" src="/files/stm32.jpg"></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr><td style="padding: 2.25pt;"><br></td></tr>
+<tr style="">
+<td style="padding: 2.25pt;" valign="top">
+<table class="MsoNormalTable" style="width: 507.4pt;" border="0" cellpadding="0" cellspacing="0" width="677">
+<tbody>
+<tr>
+<td style="padding: 2.25pt; background: rgb(51, 51, 255) none repeat scroll 0% 50%; -moz-background-clip: initial; -moz-background-origin: initial; -moz-background-inline-policy: initial; width: 504.2pt;" width="672">
+<p class="MsoNormal"><span style="color: white;">&nbsp;</span><strong>
+<span style="font-family: Verdana; color: white;">About this demonstration</span></strong><span style="font-family: Verdana; color: white;"><o:p></o:p></span></p>
+</td>
+</tr>
+<tr style="height: 11.25pt;">
+<td style="padding: 2.25pt; width: 504.2pt; height: 11.25pt;" valign="top" width="672">
+<p class="MsoNormal">
+<span class="txt">This webserver is a part of a demonstration package developed on the top level of the lwIP TCP/IP stack.<br>
+<br>The package contains nine applications:</span></p>
+<ol>
+<li><span style="font-size: 10pt; font-family: Verdana;">Applications running in standalone (without an RTOS):</span></li>
+</ol>
+<ul style="margin-left: 40px;">
+<li><span class="txt">A Webserver.&nbsp;<o:p></o:p></span></li>
+<li><span class="txt">A TFTP server.</span></li>
+<li><span class="txt">A TCP echo client application</span></li>
+<li><span class="txt">A TCP echo server application</span></li>
+<li><span class="txt">A UDP echo client application</span></li>
+<li><span class="txt">A UDP echo server application&nbsp;</span></li>
+</ul>
+<ol start="2">
+<li><span style="font-size: 10pt; font-family: Verdana;">Applications running with FreeRTOS operating system:</span></li>
+</ol>
+<ul style="margin-left: 40px;">
+<li><span class="txt">A Webserver based on netconn API.</span></li>
+<li><span class="txt">A Webserver based on socket API.</span></li>
+<li><span class="txt">A TCP/UDP echo server application based on netconn API.&nbsp;</span></li>
+</ul>
+<ul type="disc">
+</ul>
+<p class="MsoNormal" style=""><o:p>&nbsp;</o:p></p>
+</td>
+<td style="border: medium none ; padding: 0cm;" width="4">
+<p class="MsoNormal">&nbsp;</p>
+</td>
+</tr>
+<tr style="">
+<td style="padding: 2.25pt; background: rgb(51, 51, 255) none repeat scroll 0% 50%; -moz-background-clip: initial; -moz-background-origin: initial; -moz-background-inline-policy: initial; width: 504.2pt;" width="672">
+<p class="MsoNormal"><span style="color: white;">&nbsp;</span><strong><span style="font-family: Verdana; color: white;">About LwIP</span></strong><span style="font-family: Verdana; color: white;"><o:p></o:p></span></p>
+</td>
+<td style="border: medium none ; padding: 0cm;" width="4">
+<p class="MsoNormal">&nbsp;</p>
+</td>
+</tr>
+<tr style="">
+<td colspan="2" style="padding: 2.25pt; width: 507.4pt;" width="677">
+<p style="margin-bottom: 12pt;"><span class="txt">
+LwIP, pronounced lightweight IP, is an open source TCP/IP stack developed by Adam Dunkels at the Swedish Institute of Computer Science and is maintained now by a world wide community of developers.<br><br>
+LwIP features:<br>
+<br>
+- IP (Internet Protocol) including packet forwarding over multiple network interfaces<br>
+- ICMP (Internet Control Message Protocol) for network maintenance and debugging<br>
+- UDP (User Datagram Protocol) including experimental UDP-lite extensions<br>
+- TCP (Transmission Control Protocol) with congestion control, RTT estimation and fast recovery/fast retransmit<br>
+- Specialized raw API for enhanced performance<br>
+- Optional Berkeley-alike socket API<br>
+- DHCP (Dynamic Host Configuration Protocol)<br>
+- PPP (Point-to-Point Protocol)<br>
+- ARP (Address Resolution Protocol) for Ethernet<br>
+<br>
+For more informations you can refer to the website: &nbsp;<a href="http://savannah.nongnu.org/projects/lwip/">http://savannah.nongnu.org/projects/lwip/
+</a><o:p></o:p></span></p>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="MsoNormal"><o:p></o:p></p>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<span style="display: none;"><o:p></o:p></span>
+<div align="center">
+<table class="MsoNormalTable" style="background: black none repeat scroll 0% 50%; -moz-background-clip: initial; -moz-background-origin: initial; -moz-background-inline-policy: initial; width: 574.5pt;" border="0" cellpadding="0" cellspacing="0" width="766">
+<tbody>
+<tr style="">
+<td style="padding: 0cm; width: 100%;" width="100%">
+<p class="MsoNormal"><img id="_x0000_i1028" src="inchtml-pages-stm32_connectivity_files/pixel.gif" border="0" height="1" width="1"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="MsoNormal" style="text-align: center;" align="center"><span style="display: none;"><o:p>&nbsp;</o:p></span></p>
+<div align="center">
+<table class="MsoNormalTable" style="width: 574.5pt;" border="0" cellpadding="0" cellspacing="0" width="766">
+<tbody>
+<tr style="">
+<td style="padding: 0cm; width: 100%;" width="100%">
+<div id="footer">
+<p class="legal" style="text-align: center;" align="center">All rights reserved ©2011 STMicroelectronics&nbsp;</p>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="LED" align="center" class="tabcontent">
+<span style="font-family: Verdana;">This page
+allows you to control the four LEDs: LED1, LED2, LED3 and LED4 located in
+the&nbsp;STM324xG-EVAL board.</span>
+<span style="font-family: Verdana;">To put on/off a LED you have to
+check/uncheck its corresponding checkbox. Then you have to click on
+"Send" button to submit the new LEDs</span><br style="font-family: Verdana;">
+<span style="font-family: Verdana;">configuration. Finally
+check in the&nbsp;STM324xG-EVAL board that you get the desired LEDs
+are putted on/off. </span><br style="font-family: Verdana;">
+</small>
+<br>
+<br>
+<table style="width: 787px; color: white; height: 31px;" white="" color="" ;="" 100="" border="0" cellpadding="3" cellspacing="0">
+<tbody>
+<tr>
+<td class="tabtitle" style="height: 15px; background-color: rgb(51, 51, 255);"><big><big><font size="-1"><big><big><strong>STM32
+Webserver LEDs Control</strong></big></big></font></big></big></td>
+</tr>
+</tbody>
+</table>
+<br>
+<form method="get" action="/leds.cgi"><input value="1" name="led" type="checkbox">LED1<br>
+<input value="2" name="led" type="checkbox">LED2<br>
+<input value="3" name="led" type="checkbox">LED3<br>
+<input value="4" name="led" type="checkbox">LED4
+<br>
+<br>
+<input value="Send" type="submit"> </form>
+<h3><font size="-1"><span style="color: black;"></span>
+</font></h3><h3 style="font-weight: normal; font-family: Verdana;"><font size="-1"><br>
+</font></h3>
+<span style="font-family: Verdana;"></span><font size="-1"><a style="font-family: Verdana;" href="/STM32F4x7.html"><big><span style="font-weight: bold;"></span></big></a></font>
+<font size="-1"><span style="color: black;">_______________________________________________________________________________________________________________<br>
+</span></font><font class="footmsg">&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;<comment title="#config timefmt=&quot;%Y&quot; " xmlns="http://disruptive-innovations.com/zoo/nvu"><!--#config timefmt="%Y" --></comment><comment title="#echo var=&quot;DATE_GMT&quot; " xmlns="http://disruptive-innovations.com/zoo/nvu"><!--#echo var="DATE_GMT" --></comment>
+<span style="color: silver;">&nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;All rights
+reserved © 2011 STMicroelectronics</span>&nbsp;</font>
+</div>
+
+</div>
+<script>document.getElementById("defaultOpen").click();</script>
+</body></html>

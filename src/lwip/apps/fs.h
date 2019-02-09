@@ -63,9 +63,9 @@ typedef void fs_file_extension;
 #endif
 
 struct fs_file {
-  const char *data;
-  int len;
-  int index;
+  const u8_t *data;
+  u32_t len;
+  u32_t index;
   /* pextension is free for implementations to hold private (extensional)
      arbitrary data, e.g. holding some file state or file system handle */
   fs_file_extension *pextension;
@@ -108,9 +108,8 @@ void fs_state_free(struct fs_file *file, void *state);
 #endif /* #if LWIP_HTTPD_FILE_STATE */
 
 struct fsdata_file {
-//  const struct fsdata_file *next;
   const char *name;
-  const unsigned char *data;
+  const u8_t *data;
   u32_t len;
   u8_t flags;
 #if HTTPD_PRECALCULATED_CHECKSUM

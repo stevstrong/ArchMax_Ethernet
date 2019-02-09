@@ -40,14 +40,18 @@
    ---------- Lwip Debug options ----------
    ----------------------------------------
 */
-//#define LWIP_DEBUG   LWIP_DBG_ON
+#define LWIP_DEBUG   LWIP_DBG_ON
 //#define DHCP_DEBUG   LWIP_DBG_ON
 //#define ETHARP_DEBUG   LWIP_DBG_ON
+#define TCP_DEBUG   LWIP_DBG_ON
 //#define TCP_INPUT_DEBUG   LWIP_DBG_ON
 //#define NETIF_DEBUG   LWIP_DBG_ON
 //#define TIMERS_DEBUG LWIP_DBG_ON
 //#define LWIP_DEBUG_TIMERNAMES 1
 //#define HTTPD_DEBUG   LWIP_DBG_ON
+//#define UDP_DEBUG   LWIP_DBG_ON
+//#define TFTP_DEBUG   LWIP_DBG_ON
+
 
 //---------------------------------------------
 // HTTPD options
